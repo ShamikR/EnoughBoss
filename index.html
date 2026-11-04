@@ -93,6 +93,7 @@ p{margin:0}
 #asks .pick{padding:6px 9px}
 #asks{gap:5px;padding-bottom:4px}
 #submit{position:sticky;bottom:6px}
+#aim{position:sticky;bottom:6px}
 #weapons{gap:5px}
 #weapons .pick{padding:6px 10px}
 #pips{display:flex;flex-wrap:wrap;gap:4px;min-height:18px}
@@ -253,12 +254,14 @@ p{margin:0}
   const ICONS = {
     pistol:'<svg viewBox="0 0 64 30" aria-hidden="true"><rect x="8" y="5" width="44" height="9" rx="1"/><rect x="42" y="2" width="4" height="3"/><path d="M12 14h15l-4 15H11z"/><path d="M28 14h7v4h-7z"/></svg>',
     sniper:'<svg viewBox="0 0 64 30" aria-hidden="true"><rect x="1" y="14" width="63" height="3"/><rect x="24" y="4" width="20" height="5" rx="2"/><rect x="31" y="9" width="4" height="5"/><path d="M0 13h27v5l-13 9H3z"/></svg>',
+    web:'<svg viewBox="0 0 64 30" aria-hidden="true"><path d="M32 15 8 3M32 15H4M32 15 8 27M32 15 56 3M32 15h28M32 15 56 27M32 1v28M18 8c5 2 5 12 0 14M46 8c-5 2-5 12 0 14M24 3c3 3 13 3 16 0M24 27c3-3 13-3 16 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     axe:'<svg viewBox="0 0 64 30" aria-hidden="true"><path d="M2 21 44 12l1 4L3 25z"/><path d="M40 4c5 3 13 3 20-2 2 8 2 18-2 26-5-6-12-8-15-8l-3-16z"/></svg>',
     crossbow:'<svg viewBox="0 0 64 30" aria-hidden="true"><rect x="2" y="13" width="50" height="4"/><path d="M2 17h16l-5 9H6z"/><path d="M47 1c6 3 9 8 9 14s-3 11-9 14l-1-3c5-3 7-7 7-11s-2-8-7-11z"/><path d="M47 2 23 14l24 13v-2L27 14 47 4z"/></svg>'
   };
   const WEAPONS = [
     {id:'pistol', name:'Pistol', sub:'6 rounds. Quick, but it pulls off line.', rounds:6, need:1, spread:15, cool:.25, hint:'Tap the target to fire.', kick:5},
     {id:'sniper', name:'Sniper', sub:'3 rounds. The scope slows the target.', rounds:3, need:1, spread:0, cool:.6, hint:'Press and hold to look through the scope. Drag to aim, let go to fire. Let go early to lower the rifle.', kick:11},
+    {id:'web', name:'Spider web', sub:'4 webs. Wide net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:1.5, hint:'Tap ahead of the target to fire a sticky web.', kick:1},
     {id:'axe', name:'Throwing axe', sub:'3 axes. Big hit area, slow flight.', rounds:3, need:1, spread:7, cool:.2, flight:.42, reach:1.4, hint:'Tap ahead of the target. The axe takes a moment to arrive.', kick:3},
     {id:'crossbow', name:'Crossbow', sub:'4 bolts. Exact, with a short delay.', rounds:4, need:1, spread:2, cool:.2, flight:.2, hint:'Tap slightly ahead of the target to shoot a bolt.', kick:2}
   ];
@@ -294,7 +297,7 @@ p{margin:0}
   let chaos = false, halt = false, wayX = 0, back = 0, vy = 0, dir = 1, zig = .4, dart = 1, squash = 0;
   let aimT = 0, gunIn = 0, recoil = 0, gunAng = 0, gs = 190, prevPt = null;
   let gunAim = {x:0, y:0}, muzzle = {x:0, y:0}, tracers = [];
-  let cracks = [], shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
+  let webbed = false, cracks = [], shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
   let gun3d = null, targetOut = false, spawn = 0, mailTimer = 0, rBig = 60, rSmall = 36;
   let penalties = [], penaltyBag = [];
   let bubble = null, lastLaugh = -9, nextLaugh = 0;
@@ -410,6 +413,7 @@ p{margin:0}
       g.fillStyle = '#fbfaf3'; g.beginPath(); g.arc(h.x * r, h.y * r, Math.max(3, r * .08), 0, 7); g.fill();
       g.fillStyle = '#10161d'; g.beginPath(); g.arc(h.x * r, h.y * r, Math.max(2, r * .055), 0, 7); g.fill();
     }
+    if (webbed) drawWeb(g, 0, 0, r * 1.28);
     if (hitPulse > 0) { g.fillStyle = `rgba(246,232,143,${hitPulse * .7})`; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); }
     g.restore();
   }
@@ -441,9 +445,20 @@ p{margin:0}
     cracks.push({x, y, size, rays});
     if (cracks.length > 24) cracks.shift();
   }
+  function drawWeb(g, x, y, R) {
+    const spokes = 12, pt = (i, k) => { const a = i / spokes * Math.PI * 2 + .2; return [x + Math.cos(a) * R * k, y + Math.sin(a) * R * k]; };
+    g.save(); g.strokeStyle = 'rgba(245,247,250,.88)'; g.lineWidth = 1.2; g.beginPath();
+    for (let i = 0; i < spokes; i++) { g.moveTo(x, y); g.lineTo(...pt(i, 1)); }
+    for (const k of [.28, .52, .76, .98]) for (let i = 0; i < spokes; i++) {
+      const [ax, ay] = pt(i, k), [bx, by] = pt(i + 1, k), [mx, my] = pt(i + .5, k * .9);
+      g.moveTo(ax, ay); g.quadraticCurveTo(mx, my, bx, by);
+    }
+    g.stroke(); g.restore();
+  }
   function drawCracks(g) {
     g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
     for (const c of cracks) {
+      if (c.web) { drawWeb(g, c.x, c.y, Math.max(26, r * .95)); continue; }
       for (const [lift, colour, width] of [[.9, 'rgba(172,202,214,.45)', 1.1], [0, '#0b1319', 1.5]]) {
         g.strokeStyle = colour; g.lineWidth = width; g.beginPath();
         for (const ray of c.rays) ray.forEach(([x, y], i) => i ? g.lineTo(c.x + x + lift, c.y + y + lift) : g.moveTo(c.x + x + lift, c.y + y + lift));
@@ -634,7 +649,7 @@ p{margin:0}
       ctx.strokeStyle = `rgba(255,226,130,${t.life})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(muzzle.x, muzzle.y); ctx.lineTo(t.x, t.y); ctx.stroke();
     }
-    if (gun3d) gun3d.render(dt, {id: weapon.id, gunIn, aimT, recoil, clock, aim: gunAim, W, H, shot, loaded: !shot && rounds > 0 && cooling < .02});
+    if (gun3d) gun3d.render(dt, {id: weapon.id, gunIn, aimT, recoil, clock, aim: gunAim, W, H, r, shot, loaded: !shot && rounds > 0 && cooling < .02});
     else if (gunIn > 0) drawGun(ctx, dt);
     if (phase === 'shoot' && aimT > (gun3d ? .6 : .45)) drawScope(ctx);
     if (flash) { ctx.fillStyle = `rgba(255,250,220,${flash * .35})`; ctx.fillRect(0, 0, W, H); }
@@ -766,7 +781,7 @@ p{margin:0}
       const m = mesh(new T.SphereGeometry(radii[n] * .98, 14, 10), nail, parent);
       m.position.copy(tip).addScaledVector(dir, radii[n] * -.25);
       m.scale.set(.82, .34, 1.15);
-      const out = tip.clone().sub(V(0, tip.y, parent.userData.gripZ || 0)).normalize();
+      const out = parent.userData.nailUp ? UP.clone() : tip.clone().sub(V(0, tip.y, parent.userData.gripZ || 0)).normalize();
       m.quaternion.setFromUnitVectors(UP, out); m.position.addScaledVector(out, radii[n] * .72);
     }
     function sleeve(parent, wrist, elbow, r0, r1) {
@@ -933,6 +948,37 @@ p{margin:0}
     gripHand(xbow, 0, -.012, -.04);
     leftHand(xbow, .034, .1);
 
+    /* Web launcher: an open hand with a strapped steel launcher on the wrist */
+    const webHand = new T.Group(); scene.add(webHand); webHand.userData.nailUp = true;
+    const wpalm = mesh(new T.SphereGeometry(1, 28, 20), skin, webHand, 0, -.02, .03); wpalm.scale.set(.046, .018, .056);
+    const wrist0 = V(0, -.024, .09);
+    const kn = [V(-.034, -.016, -.014), V(-.012, -.013, -.02), V(.011, -.014, -.018), V(.033, -.018, -.008)];
+    kn.forEach(k => bone(webHand, wrist0, k, .017, .0115, skin));
+    kn.forEach((k, i) => {
+      const l = [.92, 1.04, 1, .82][i], sx = (i - 1.5) * .007;
+      finger(webHand, [k, V(k.x + sx, k.y - .002, k.z - .042 * l), V(k.x + sx * 2, k.y - .009, k.z - .074 * l), V(k.x + sx * 2.6, k.y - .02, k.z - .1 * l)], [.0112, .0103, .0092, .0082]);
+    });
+    finger(webHand, [V(-.03, -.03, .06), V(-.056, -.028, .022), V(-.07, -.026, -.006), V(-.074, -.026, -.03)], [.0155, .013, .0112, .0098]);
+    sleeve(webHand, V(0, -.03, .14), V(.2, -.46, .72), .036, .062);
+    const strap = mesh(new T.TorusGeometry(.034, .0065, 12, 30), griptex, webHand, 0, -.026, .098); strap.scale.set(1, .78, 1);
+    const launcher = mesh(new T.CylinderGeometry(.0125, .015, .082, 22), bright, webHand, 0, .0085, .082); launcher.rotation.x = Math.PI / 2;
+    const nozzle = mesh(new T.ConeGeometry(.0125, .022, 22), steel, webHand, 0, .0085, .03); nozzle.rotation.x = -Math.PI / 2;
+    const tank = mesh(new T.BoxGeometry(.022, .012, .036), steel, webHand, 0, .0215, .092);
+    mesh(new T.SphereGeometry(.0024, 10, 8), M({color: '#ff4a1f', emissive: '#ff3a12', emissiveIntensity: 2}), webHand, 0, .0282, .078);
+    const webTex = texture(256, (g, s) => {
+      const c = s / 2, spokes = 14, pt = (i, k) => { const a = i / spokes * Math.PI * 2; return [c + Math.cos(a) * c * k, c + Math.sin(a) * c * k]; };
+      g.strokeStyle = 'rgba(255,255,255,.96)'; g.lineWidth = 2.4; g.beginPath();
+      for (let i = 0; i < spokes; i++) { g.moveTo(c, c); g.lineTo(...pt(i, .98)); }
+      for (const k of [.25, .48, .72, .95]) for (let i = 0; i < spokes; i++) {
+        const [ax, ay] = pt(i, k), [bx, by] = pt(i + 1, k), [mx, my] = pt(i + .5, k * .88);
+        g.moveTo(ax, ay); g.quadraticCurveTo(mx, my, bx, by);
+      }
+      g.stroke();
+    }, 1, 1);
+    const webFly = new T.Sprite(new T.SpriteMaterial({map: webTex, transparent: true, depthWrite: false, depthTest: false}));
+    webFly.visible = false; scene.add(webFly);
+    const silk = mesh(new T.CylinderGeometry(.0028, .0028, 1, 8), M({color: '#f4f6f8', roughness: .5, emissive: '#c8ccd0', emissiveIntensity: .5}), scene); silk.visible = false;
+
     const flashTex = texture(128, (g, s) => {
       const q = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
       q.addColorStop(0, 'rgba(255,255,235,1)'); q.addColorStop(.28, 'rgba(255,205,105,.95)'); q.addColorStop(.6, 'rgba(255,120,30,.3)'); q.addColorStop(1, 'rgba(255,90,0,0)');
@@ -943,9 +989,9 @@ p{margin:0}
     const flare = new T.Sprite(new T.SpriteMaterial({map: flashTex, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true}));
     flare.visible = false; scene.add(flare);
 
-    const models = {pistol, sniper: rifle, axe: axeModel, crossbow: xbow};
-    const tips = {pistol: V(0, .0145, -.165), sniper: V(0, .016, -.99), axe: V(0, .26, -.03), crossbow: V(0, .043, -.42)};
-    const base = {pistol: [.56, -.6, -.5], sniper: [.66, -.62, -.8], axe: [.5, -.86, -.95], crossbow: [.62, -.62, -.82]};
+    const models = {pistol, sniper: rifle, axe: axeModel, crossbow: xbow, web: webHand};
+    const tips = {pistol: V(0, .0145, -.165), sniper: V(0, .016, -.99), axe: V(0, .26, -.03), crossbow: V(0, .043, -.42), web: V(0, .0085, .018)};
+    const base = {pistol: [.56, -.6, -.5], sniper: [.66, -.62, -.8], axe: [.5, -.86, -.95], crossbow: [.62, -.62, -.82], web: [.46, -.5, -.5]};
     scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     flare.castShadow = false;
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
@@ -971,7 +1017,7 @@ p{margin:0}
       tmp.set(s.aim.x / s.W * 2 - 1, 1 - s.aim.y / s.H * 2, .5).unproject(cam).normalize().multiplyScalar(7);
       const dx = tmp.x - px, dy = tmp.y - py, dz = tmp.z - pz;
       const wy = Math.atan2(-dx, -dz), wx = Math.atan2(dy, Math.hypot(dx, dz)), f = Math.min(1, dt * 16);
-      const showY = {pistol: .46, sniper: .2, axe: 1.05, crossbow: .2}[s.id], showP = {pistol: .1, sniper: .04, axe: .34, crossbow: .04}[s.id];
+      const showY = {pistol: .46, sniper: .2, axe: 1.05, crossbow: .2, web: .22}[s.id], showP = {pistol: .1, sniper: .04, axe: .34, crossbow: .04, web: .3}[s.id];
       yaw += (wy * .62 + showY - yaw) * f; pitch += (wx * .6 + showP - pitch) * f;
       if (s.id === 'sniper') { px += (0 - px) * ease; py += (-.098 - py) * ease; pz += (-.215 - pz) * ease; }
       model.position.set(px, py, pz + s.recoil * .035);
@@ -999,6 +1045,13 @@ p{margin:0}
           fly.position.y += Math.sin(k * Math.PI) * .42;
           fly.rotation.set(-k * Math.PI * 7, 0, .12);
         } else fly.lookAt(fly.position.clone().add(fly.position.clone().sub(far)));
+      }
+      webFly.visible = silk.visible = false;
+      if (s.shot && s.id === 'web') {
+        const k = s.shot.t, far = tmp.set(s.shot.x / s.W * 2 - 1, 1 - s.shot.y / s.H * 2, .5).unproject(cam).normalize().multiplyScalar(6).clone();
+        const worldH = 2 * Math.tan(cam.fov * Math.PI / 360) * 6, size = .05 + (2 * s.r * 1.2 / s.H * worldH - .05) * k;
+        webFly.position.copy(wp).lerp(far, k); webFly.scale.set(size, size, 1); webFly.visible = true;
+        const a = wp.clone(), b = webFly.position.clone(); silk.visible = true; stretch(silk, a, b);
       }
       const on = s.recoil > .5 && (s.id === 'pistol' || s.id === 'sniper');
       flare.visible = on; blast.intensity = on ? 3.5 * s.recoil : 0; blast.position.copy(wp);
@@ -1108,7 +1161,7 @@ p{margin:0}
     if (phase !== 'shoot' || rounds <= 0 || cooling > 0 || shot) return;
     const thrown = !!weapon.flight;
     rounds--; shotsTotal++; cooling = weapon.cool + (weapon.flight || 0); flash = thrown ? 0 : 1; shake = calm ? 0 : weapon.kick; recoil = 1;
-    bang(weapon.id === 'sniper' ? 2 : weapon.id === 'axe' ? 1.2 : weapon.id === 'crossbow' ? .35 : 1, weapon.id === 'axe' ? 650 : weapon.id === 'crossbow' ? 2400 : 1500);
+    bang(weapon.id === 'sniper' ? 2 : weapon.id === 'axe' ? 1.2 : weapon.id === 'crossbow' ? .35 : weapon.id === 'web' ? .7 : 1, weapon.id === 'axe' ? 650 : weapon.id === 'crossbow' || weapon.id === 'web' ? 2400 : 1500);
     try { navigator.vibrate && navigator.vibrate(weapon.id === 'sniper' ? 40 : 15); } catch (e) {}
     const a = Math.random() * 7, d = Math.random() * weapon.spread;
     const x = q.x + Math.cos(a) * d, y = q.y + Math.sin(a) * d;
@@ -1121,10 +1174,12 @@ p{margin:0}
     const dx = x - tx, dy = y - ty;
     if (Math.hypot(dx, dy) <= r * (weapon.reach || 1)) {
       hits++; hitPulse = 1; strikes = 0;
-      holes.push({x: Math.max(-.8, Math.min(.8, dx / r)), y: Math.max(-.8, Math.min(.8, dy / r))});
+      if (weapon.id === 'web') webbed = true;
+      else holes.push({x: Math.max(-.8, Math.min(.8, dx / r)), y: Math.max(-.8, Math.min(.8, dy / r))});
       if (hits >= weapon.need) { win(); return; }
     } else {
-      addCrack(x, y);
+      if (weapon.id === 'web') cracks.push({web: true, x, y}); else addCrack(x, y);
+      if (cracks.length > 24) cracks.shift();
       speed += .15; strikes++;
       later(240, strikes >= 5 ? terminate : punish);
       phase = 'mail';
@@ -1356,7 +1411,7 @@ p{margin:0}
   }
   function toAsk() {
     timers.forEach(clearTimeout); timers = [];
-    stamp(''); attempt = 0; speed = .6; holes = []; marks = []; chaos = false; halt = false; bubble = null; penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; cracks = []; targetOut = false; hideMail(); show('ask');
+    stamp(''); attempt = 0; speed = .6; holes = []; marks = []; chaos = false; halt = false; bubble = null; penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; cracks = []; webbed = false; targetOut = false; hideMail(); show('ask');
   }
   function grant(viaShot) {
     tally.won++; saveTally();
@@ -1415,7 +1470,7 @@ p{margin:0}
   $('again').onclick = toAsk;
   $('newFace').onclick = $('restart').onclick = () => {
     stamp(''); holes = []; marks = []; speed = 0; chaos = false; halt = false; bubble = null;
-    penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; cracks = []; targetOut = false; hideMail(); show('setup');
+    penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; cracks = []; webbed = false; targetOut = false; hideMail(); show('setup');
   };
 
   /* ---------- build lists ---------- */
