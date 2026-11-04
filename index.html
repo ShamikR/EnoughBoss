@@ -261,7 +261,7 @@ p{margin:0}
   const WEAPONS = [
     {id:'pistol', name:'Pistol', sub:'6 rounds. Quick, but it pulls off line.', rounds:6, need:1, spread:15, cool:.25, hint:'Tap the target to fire.', kick:5},
     {id:'sniper', name:'Sniper', sub:'3 rounds. The scope slows the target.', rounds:3, need:1, spread:0, cool:.6, hint:'Press and hold to look through the scope. Drag to aim, let go to fire. Let go early to lower the rifle.', kick:11},
-    {id:'web', name:'Spider web', sub:'4 webs. Wide net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:1.5, hint:'Tap ahead of the target to fire a sticky web.', kick:1},
+    {id:'web', name:'Spider web', sub:'4 webs. Huge net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:2, hint:'Tap ahead of the target to fire a sticky web.', kick:1},
     {id:'axe', name:'Throwing axe', sub:'3 axes. Big hit area, slow flight.', rounds:3, need:1, spread:7, cool:.2, flight:.42, reach:1.4, hint:'Tap ahead of the target. The axe takes a moment to arrive.', kick:3},
     {id:'crossbow', name:'Crossbow', sub:'4 bolts. Exact, with a short delay.', rounds:4, need:1, spread:2, cool:.2, flight:.2, hint:'Tap slightly ahead of the target to shoot a bolt.', kick:2}
   ];
@@ -413,7 +413,7 @@ p{margin:0}
       g.fillStyle = '#fbfaf3'; g.beginPath(); g.arc(h.x * r, h.y * r, Math.max(3, r * .08), 0, 7); g.fill();
       g.fillStyle = '#10161d'; g.beginPath(); g.arc(h.x * r, h.y * r, Math.max(2, r * .055), 0, 7); g.fill();
     }
-    if (webbed) drawWeb(g, 0, 0, r * 1.28);
+    if (webbed) drawWeb(g, 0, 0, r * 1.75);
     if (hitPulse > 0) { g.fillStyle = `rgba(246,232,143,${hitPulse * .7})`; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); }
     g.restore();
   }
@@ -458,7 +458,7 @@ p{margin:0}
   function drawCracks(g) {
     g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
     for (const c of cracks) {
-      if (c.web) { drawWeb(g, c.x, c.y, Math.max(26, r * .95)); continue; }
+      if (c.web) { drawWeb(g, c.x, c.y, Math.max(44, r * 1.65)); continue; }
       for (const [lift, colour, width] of [[.9, 'rgba(172,202,214,.45)', 1.1], [0, '#0b1319', 1.5]]) {
         g.strokeStyle = colour; g.lineWidth = width; g.beginPath();
         for (const ray of c.rays) ray.forEach(([x, y], i) => i ? g.lineTo(c.x + x + lift, c.y + y + lift) : g.moveTo(c.x + x + lift, c.y + y + lift));
@@ -494,7 +494,7 @@ p{margin:0}
     if (phase === 'setup') { tx = W / 2; ty = H * .54; tilt = 0; return; }
     if (halt) { tilt *= .9; return; }
     if (chaos) {
-      const d = dt * slow * .72, left = r + 6, right = W - r - 6, top = 26 + r * 1.3;
+      const d = dt * slow * .684, left = r + 6, right = W - r - 6, top = 26 + r * 1.3;
       const floor = Math.max(top + 40, H - 20 - r);
       zig -= d;
       if (zig <= 0) { zig = (.3 + Math.random() * .35) / (.7 + speed * .15); back = .09; dart = 2; }
@@ -950,16 +950,25 @@ p{margin:0}
 
     /* Web launcher: an open hand with a strapped steel launcher on the wrist */
     const webHand = new T.Group(); scene.add(webHand); webHand.userData.nailUp = true;
-    const wpalm = mesh(new T.SphereGeometry(1, 28, 20), skin, webHand, 0, -.02, .03); wpalm.scale.set(.046, .018, .056);
+    const gloveRed = M({color: '#a90f19', roughness: .46, envMapIntensity: .55});
+    const gloveWhite = M({color: '#dedcd4', roughness: .54, envMapIntensity: .42});
+    function gloveFinger(pts, radii) {
+      for (let i = 1; i < pts.length; i++) bone(webHand, pts[i - 1], pts[i], radii[i - 1], radii[i], i === pts.length - 1 ? gloveWhite : gloveRed);
+    }
+    const wpalm = mesh(new T.SphereGeometry(1, 28, 20), gloveRed, webHand, 0, -.02, .03); wpalm.scale.set(.046, .019, .056);
+    const backPanel = mesh(new T.SphereGeometry(1, 24, 16), gloveWhite, webHand, .002, -.0045, .034); backPanel.scale.set(.03, .0046, .03);
     const wrist0 = V(0, -.024, .09);
     const kn = [V(-.034, -.016, -.014), V(-.012, -.013, -.02), V(.011, -.014, -.018), V(.033, -.018, -.008)];
-    kn.forEach(k => bone(webHand, wrist0, k, .017, .0115, skin));
+    kn.forEach(k => bone(webHand, wrist0, k, .017, .012, gloveRed));
     kn.forEach((k, i) => {
       const l = [.92, 1.04, 1, .82][i], sx = (i - 1.5) * .007;
-      finger(webHand, [k, V(k.x + sx, k.y - .002, k.z - .042 * l), V(k.x + sx * 2, k.y - .009, k.z - .074 * l), V(k.x + sx * 2.6, k.y - .02, k.z - .1 * l)], [.0112, .0103, .0092, .0082]);
+      const pad = mesh(new T.SphereGeometry(1, 16, 12), gloveWhite, webHand, k.x, k.y + .0088, k.z - .001); pad.scale.set(.0098, .0036, .012);
+      gloveFinger([k, V(k.x + sx, k.y + .001, k.z - .04 * l), V(k.x + sx * 2, k.y - .006, k.z - .071 * l), V(k.x + sx * 2.5, k.y - .018, k.z - .096 * l)], [.0118, .0108, .0098, .0088]);
     });
-    finger(webHand, [V(-.03, -.03, .06), V(-.056, -.028, .022), V(-.07, -.026, -.006), V(-.074, -.026, -.03)], [.0155, .013, .0112, .0098]);
-    sleeve(webHand, V(0, -.03, .14), V(.2, -.46, .72), .036, .062);
+    gloveFinger([V(-.03, -.03, .06), V(-.056, -.028, .022), V(-.07, -.026, -.006), V(-.074, -.026, -.03)], [.0162, .0136, .0118, .0104]);
+    sleeve(webHand, V(.006, -.04, .185), V(.2, -.46, .72), .036, .062);
+    bone(webHand, V(0, -.026, .082), V(.004, -.034, .165), .0365, .05, gloveWhite);
+    const band = mesh(new T.TorusGeometry(.0445, .0042, 10, 32), gloveRed, webHand, .002, -.03, .13); band.scale.set(1, .96, 1);
     const strap = mesh(new T.TorusGeometry(.034, .0065, 12, 30), griptex, webHand, 0, -.026, .098); strap.scale.set(1, .78, 1);
     const launcher = mesh(new T.CylinderGeometry(.0125, .015, .082, 22), bright, webHand, 0, .0085, .082); launcher.rotation.x = Math.PI / 2;
     const nozzle = mesh(new T.ConeGeometry(.0125, .022, 22), steel, webHand, 0, .0085, .03); nozzle.rotation.x = -Math.PI / 2;
@@ -1049,7 +1058,7 @@ p{margin:0}
       webFly.visible = silk.visible = false;
       if (s.shot && s.id === 'web') {
         const k = s.shot.t, far = tmp.set(s.shot.x / s.W * 2 - 1, 1 - s.shot.y / s.H * 2, .5).unproject(cam).normalize().multiplyScalar(6).clone();
-        const worldH = 2 * Math.tan(cam.fov * Math.PI / 360) * 6, size = .05 + (2 * s.r * 1.2 / s.H * worldH - .05) * k;
+        const worldH = 2 * Math.tan(cam.fov * Math.PI / 360) * 6, size = .05 + (2 * s.r * 2 / s.H * worldH - .05) * k;
         webFly.position.copy(wp).lerp(far, k); webFly.scale.set(size, size, 1); webFly.visible = true;
         const a = wp.clone(), b = webFly.position.clone(); silk.visible = true; stretch(silk, a, b);
       }
