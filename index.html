@@ -3,6 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Manager rejected your hike? Upload their photo, pick a weapon, and try to win it before you get fired.">
+<meta name="theme-color" content="#1b2f3e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23fbfaf3'/%3E%3Ccircle cx='16' cy='16' r='11' fill='%23d0202b'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23fbfaf3'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23d0202b'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EnoughBoss">
+<meta property="og:title" content="EnoughBoss: Manager rejected you? Take your shot.">
+<meta property="og:description" content="Ask for a hike, get rejected 99% of the time, and pick a weapon. Miss five times and you're fired.">
+<meta property="og:url" content="https://shamikr.github.io/EnoughBoss/">
+<meta property="og:image" content="https://shamikr.github.io/EnoughBoss/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="EnoughBoss: Manager rejected you? Take your shot.">
+<meta name="twitter:description" content="Ask for a hike, get rejected 99% of the time, and pick a weapon. Miss five times and you're fired.">
+<meta name="twitter:image" content="https://shamikr.github.io/EnoughBoss/preview.png">
 <style>html,body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;height:100%}</style>
 </head>
 <body>
@@ -72,6 +87,9 @@ p{margin:0}
   #deck{max-height:none;min-height:0;border-top:0;border-left:3px dashed var(--ink)}
 }
 @media (max-height:480px){header{padding-block:4px}.panel{gap:7px;padding-block:8px 10px}}
+#challenge{margin:0;padding:8px 10px;border:2px solid var(--stamp);border-radius:3px;background:var(--paper);color:var(--stamp);font-weight:700}
+.rank{font-weight:700}
+.rank b{color:var(--stamp)}
 #asks .pick{padding:6px 9px}
 #asks{gap:5px;padding-bottom:4px}
 #submit{position:sticky;bottom:6px}
@@ -130,6 +148,7 @@ p{margin:0}
   <div id="deck">
 
     <section class="panel" data-p="setup">
+      <p id="challenge" hidden></p>
       <div class="formno"><span>Form HR-7A</span><span>Step 1 of 3</span></div>
       <h2>Put a face on the target</h2>
       <input id="file" type="file" accept="image/*">
@@ -193,16 +212,24 @@ p{margin:0}
       <div class="formno"><span id="refE"></span><span>Employment ended</span></div>
       <h2>You are fired</h2>
       <p id="firedText"></p>
-      <button class="btn go" id="restart" type="button">Start again</button>
+      <p class="rank" id="firedRank"></p>
+      <button class="btn go shareBtn" type="button">Share result</button>
+      <button class="btn saveBtn" type="button" hidden>Save result image</button>
+      <p class="small shareNote" role="status" hidden></p>
+      <button class="btn" id="restart" type="button">Start again</button>
     </section>
 
     <section class="panel" data-p="won" hidden>
       <div class="formno"><span id="refD"></span><span>Decision reversed</span></div>
       <h2 id="winTitle"></h2>
       <p id="winText"></p>
+      <p class="rank" id="winRank"></p>
+      <button class="btn go shareBtn" type="button">Share result</button>
+      <button class="btn saveBtn" type="button" hidden>Save result image</button>
+      <p class="small shareNote" role="status" hidden></p>
       <div class="row">
         <button class="btn" id="newFace" type="button">Change face</button>
-        <button class="btn go" id="again" type="button">Ask for more</button>
+        <button class="btn" id="again" type="button">Ask for more</button>
       </div>
     </section>
   </div>
@@ -267,7 +294,7 @@ p{margin:0}
   let chaos = false, halt = false, wayX = 0, back = 0, vy = 0, dir = 1, zig = .4, dart = 1, squash = 0;
   let aimT = 0, gunIn = 0, recoil = 0, gunAng = 0, gs = 190, prevPt = null;
   let gunAim = {x:0, y:0}, muzzle = {x:0, y:0}, tracers = [];
-  let shot = null, strikes = 0, fired = false, ringBus = null;
+  let shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
   let gun3d = null, targetOut = false, spawn = 0, mailTimer = 0, rBig = 60, rSmall = 36;
   let penalties = [], penaltyBag = [];
   let bubble = null, lastLaugh = -9, nextLaugh = 0;
@@ -1047,7 +1074,7 @@ p{margin:0}
   function fire(q) {
     if (phase !== 'shoot' || rounds <= 0 || cooling > 0 || shot) return;
     const thrown = !!weapon.flight;
-    rounds--; cooling = weapon.cool + (weapon.flight || 0); flash = thrown ? 0 : 1; shake = calm ? 0 : weapon.kick; recoil = 1;
+    rounds--; shotsTotal++; cooling = weapon.cool + (weapon.flight || 0); flash = thrown ? 0 : 1; shake = calm ? 0 : weapon.kick; recoil = 1;
     bang(weapon.id === 'sniper' ? 2 : weapon.id === 'axe' ? 1.2 : weapon.id === 'crossbow' ? .35 : 1, weapon.id === 'axe' ? 650 : weapon.id === 'crossbow' ? 2400 : 1500);
     try { navigator.vibrate && navigator.vibrate(weapon.id === 'sniper' ? 40 : 15); } catch (e) {}
     const a = Math.random() * 7, d = Math.random() * weapon.spread;
@@ -1074,6 +1101,107 @@ p{margin:0}
     renderHud();
     if (rounds === 0) later(650, lose);
   }
+  /* ---------- results and sharing ---------- */
+  const SHARE_URL = 'https://shamikr.github.io/EnoughBoss/';
+  const ASK = {leave: 'leave', bonus: 'a bonus', hike: 'a hike', promotion: 'a promotion', release: 'release from my project', laptop: 'a new laptop', cab: 'free pick-up and drop', wfh: 'work from home', project: 'a new project'};
+  const FIRED_TITLES = {leave: 'Burnt Out and Bench Bound', bonus: 'Exceeded Expectations of Failure', hike: 'Underpaid Since Joining', promotion: 'Permanent Junior Associate', release: 'Stuck on the Project Forever', laptop: 'Nine-Year-Old Laptop Owner', cab: 'Walking to Work Champion', wfh: 'Commuter for Life', project: 'Certified Bench Warmer'};
+  const plural = n => `${n} ${n === 1 ? 'shot' : 'shots'}`;
+  const challenge = (() => {
+    const m = /^(won|fired)-([a-z]+)-(\d{1,3})$/.exec(new URLSearchParams(location.search).get('c') || '');
+    return m && ASK[m[2]] ? {kind: m[1], id: m[2], shots: +m[3]} : null;
+  })();
+  if (challenge) {
+    const c = $('challenge'), n = challenge.shots;
+    c.hidden = false;
+    c.textContent = challenge.kind === 'won'
+      ? (n ? `Your friend won ${ASK[challenge.id]} in ${plural(n)}. Can you beat that?` : `Your friend got ${ASK[challenge.id]} approved first try. Can you match that?`)
+      : `Your friend got fired asking for ${ASK[challenge.id]}. Can you do better?`;
+  }
+  function earnedTitle(kind, n) {
+    if (kind === 'fired') return FIRED_TITLES[request.id];
+    if (!n) return "HR's Mythical 1%";
+    if (n === 1) return 'Promoted by Force';
+    if (n <= 3) return 'High Performer (Allegedly)';
+    return 'Survivor of the Appraisal Cycle';
+  }
+  function finish(kind) {
+    const n = shotsTotal, title = earnedTitle(kind, n), ask = ASK[request.id];
+    const beat = challenge && kind === 'won' && (challenge.kind === 'fired' || n < challenge.shots);
+    const text = kind === 'fired'
+      ? `I got fired asking for ${ask} on EnoughBoss after ${plural(n)}. Title earned: ${title}. Can you do better?`
+      : n ? `I won ${ask} on EnoughBoss in ${plural(n)}. Title earned: ${title}. Beat that.`
+        : `I got ${ask} approved first try on EnoughBoss. Title earned: ${title}. Beat that.`;
+    result = {kind, n, title, ask, text, url: `${SHARE_URL}?c=${kind}-${request.id}-${n}`};
+    const rank = $(kind === 'fired' ? 'firedRank' : 'winRank');
+    rank.textContent = 'Title earned: ';
+    const b = document.createElement('b'); b.textContent = title; rank.append(b);
+    rank.append(beat ? '. You beat your friend.' : '.');
+    document.querySelectorAll('.shareNote').forEach(p => { p.hidden = true; });
+  }
+  function fitText(g, text, x, y, width, line) {
+    const words = text.split(' '); let row = '';
+    for (const w of words) {
+      if (row && g.measureText(row + ' ' + w).width > width) { g.fillText(row, x, y); y += line; row = w; }
+      else row = row ? row + ' ' + w : w;
+    }
+    g.fillText(row, x, y); return y + line;
+  }
+  async function resultCard() {
+    try { await Promise.all([document.fonts.load('60px "Alfa Slab One"'), document.fonts.load('700 60px "Stardos Stencil"'), document.fonts.load('700 30px "Courier Prime"')]); } catch (e) {}
+    const c = document.createElement('canvas'); c.width = c.height = 1080;
+    const g = c.getContext('2d'), won = result.kind === 'won';
+    g.fillStyle = '#2b4658'; g.fillRect(0, 0, 1080, 1080);
+    g.fillStyle = '#1b2f3e'; g.fillRect(0, 0, 1080, 130); g.fillRect(0, 930, 1080, 150);
+    g.textAlign = 'center';
+    g.fillStyle = '#f6e88f'; g.font = '62px "Alfa Slab One",Georgia,serif'; g.fillText('EnoughBoss', 540, 88);
+    const sample = document.createElement('canvas'); sample.width = sample.height = 320; drawSample(sample.getContext('2d'), 320);
+    g.save(); g.translate(540, 350);
+    ['#fbfaf3', '#d0202b', '#fbfaf3', '#d0202b'].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(0, 0, 170 * (1 - i * .065), 0, 7); g.fill(); });
+    g.beginPath(); g.arc(0, 0, 126, 0, 7); g.clip(); g.drawImage(sample, -126, -126, 252, 252); g.restore();
+    g.save(); g.translate(540, 370); g.rotate(-.16);
+    g.font = '700 118px "Stardos Stencil","Arial Black",sans-serif';
+    const word = won ? 'APPROVED' : 'FIRED', w = g.measureText(word).width + 54;
+    g.fillStyle = 'rgba(251,250,243,.92)'; g.strokeStyle = g.fillStyle; g.beginPath(); g.roundRect(-w / 2, -82, w, 150, 12); g.fill();
+    g.strokeStyle = won ? '#08784a' : '#d0202b'; g.lineWidth = 10; g.stroke();
+    g.fillStyle = g.strokeStyle; g.fillText(word, 0, 34); g.restore();
+    g.fillStyle = '#fbfaf3'; g.font = '700 42px "Courier Prime","Courier New",monospace';
+    let y = fitText(g, won ? `Asked for ${result.ask}.` : `Asked for ${result.ask}. Lost the job.`, 540, 640, 940, 52);
+    g.font = '700 34px "Courier Prime","Courier New",monospace';
+    g.fillText(result.n ? `${plural(result.n)} fired` : 'No shots needed', 540, y + 2);
+    g.fillStyle = '#f6e88f'; g.font = '56px "Alfa Slab One",Georgia,serif';
+    fitText(g, result.title, 540, y + 96, 960, 66);
+    g.font = '700 31px "Courier Prime","Courier New",monospace';
+    g.fillText('Can you do better?', 540, 985);
+    g.fillStyle = '#fbfaf3'; g.font = '700 27px "Courier Prime","Courier New",monospace'; g.fillText('shamikr.github.io/EnoughBoss', 540, 1034);
+    return new Promise(res => c.toBlob(res, 'image/png'));
+  }
+  function note(btn, text) {
+    const p = btn.parentElement.querySelector('.shareNote');
+    p.hidden = false; p.textContent = text;
+  }
+  async function copyResult(btn) {
+    const line = `${result.text} ${result.url}`;
+    try { await navigator.clipboard.writeText(line); note(btn, 'Copied. Paste it into your chat.'); }
+    catch (e) { note(btn, line); }
+  }
+  document.querySelectorAll('.shareBtn').forEach(btn => btn.addEventListener('click', async () => {
+    if (!result) return;
+    if (!navigator.share) { copyResult(btn); return; }
+    try {
+      const blob = await resultCard();
+      const file = blob && new File([blob], 'enoughboss-result.png', {type: 'image/png'});
+      if (file && navigator.canShare && navigator.canShare({files: [file]})) await navigator.share({files: [file], text: `${result.text} ${result.url}`});
+      else await navigator.share({text: result.text, url: result.url});
+    } catch (e) { if (e.name !== 'AbortError') copyResult(btn); }
+  }));
+  if (/github\.io$/.test(location.hostname)) document.querySelectorAll('.saveBtn').forEach(btn => {
+    btn.hidden = false;
+    btn.addEventListener('click', async () => {
+      const blob = result && await resultCard(); if (!blob) return;
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'enoughboss-result.png'; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+  });
   function chime(hz, at) {
     if (!sound || !audio) return;
     try {
@@ -1159,6 +1287,7 @@ p{margin:0}
     hideMail();
     if (phase !== 'mail') return;
     if (fired) {
+      finish('fired');
       targetOut = false; spawn = 1; strikes = 0; penalties = [];
       $('refE').textContent = ref;
       $('firedText').textContent = `Five misses in a row ended your career here. Your ${request.name.toLowerCase()} is closed.`;
@@ -1199,7 +1328,7 @@ p{margin:0}
   }
   function toAsk() {
     timers.forEach(clearTimeout); timers = [];
-    stamp(''); attempt = 0; speed = .6; holes = []; marks = []; chaos = false; halt = false; bubble = null; penalties = []; strikes = 0; fired = false; targetOut = false; hideMail(); show('ask');
+    stamp(''); attempt = 0; speed = .6; holes = []; marks = []; chaos = false; halt = false; bubble = null; penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; targetOut = false; hideMail(); show('ask');
   }
   function grant(viaShot) {
     tally.won++; saveTally();
@@ -1209,6 +1338,7 @@ p{margin:0}
       (penalties.length ? ` Your ${penalties.length === 1 ? 'penalty is' : penalties.length + ' penalties are'} cancelled.` : '');
     penalties = []; hideMail();
     $('refD').nextElementSibling.textContent = viaShot ? 'Decision reversed' : 'Approved first time';
+    finish('won');
     speed = 0; stamp('APPROVED', 'yes'); show('won');
   }
   function win() {
@@ -1257,7 +1387,7 @@ p{margin:0}
   $('again').onclick = toAsk;
   $('newFace').onclick = $('restart').onclick = () => {
     stamp(''); holes = []; marks = []; speed = 0; chaos = false; halt = false; bubble = null;
-    penalties = []; strikes = 0; fired = false; targetOut = false; hideMail(); show('setup');
+    penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; targetOut = false; hideMail(); show('setup');
   };
 
   /* ---------- build lists ---------- */
