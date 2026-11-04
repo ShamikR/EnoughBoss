@@ -1104,6 +1104,7 @@ p{margin:0}
   /* ---------- results and sharing ---------- */
   const SHARE_URL = 'https://shamikr.github.io/EnoughBoss/';
   const ASK = {leave: 'leave', bonus: 'a bonus', hike: 'a hike', promotion: 'a promotion', release: 'release from my project', laptop: 'a new laptop', cab: 'free pick-up and drop', wfh: 'work from home', project: 'a new project'};
+  const WON_TITLES = {leave: 'Officially Out of Office', bonus: 'Bonus Bandit', hike: 'Hike Hijacker', promotion: 'Promoted by Force', release: 'Project Escape Artist', laptop: 'Laptop Liberator', cab: 'Chauffeured Champion', wfh: 'Pyjama Executive', project: 'Project Poacher'};
   const FIRED_TITLES = {leave: 'Burnt Out and Bench Bound', bonus: 'Exceeded Expectations of Failure', hike: 'Underpaid Since Joining', promotion: 'Permanent Junior Associate', release: 'Stuck on the Project Forever', laptop: 'Nine-Year-Old Laptop Owner', cab: 'Walking to Work Champion', wfh: 'Commuter for Life', project: 'Certified Bench Warmer'};
   const plural = n => `${n} ${n === 1 ? 'shot' : 'shots'}`;
   const challenge = (() => {
@@ -1117,15 +1118,9 @@ p{margin:0}
       ? (n ? `Your friend won ${ASK[challenge.id]} in ${plural(n)}. Can you beat that?` : `Your friend got ${ASK[challenge.id]} approved first try. Can you match that?`)
       : `Your friend got fired asking for ${ASK[challenge.id]}. Can you do better?`;
   }
-  function earnedTitle(kind, n) {
-    if (kind === 'fired') return FIRED_TITLES[request.id];
-    if (!n) return "HR's Mythical 1%";
-    if (n === 1) return 'Promoted by Force';
-    if (n <= 3) return 'High Performer (Allegedly)';
-    return 'Survivor of the Appraisal Cycle';
-  }
+  function earnedTitle(kind) { return (kind === 'fired' ? FIRED_TITLES : WON_TITLES)[request.id]; }
   function finish(kind) {
-    const n = shotsTotal, title = earnedTitle(kind, n), ask = ASK[request.id];
+    const n = shotsTotal, title = earnedTitle(kind), ask = ASK[request.id];
     const beat = challenge && kind === 'won' && (challenge.kind === 'fired' || n < challenge.shots);
     const text = kind === 'fired'
       ? `I got fired asking for ${ask} on EnoughBoss after ${plural(n)}. Title earned: ${title}. Can you do better?`
