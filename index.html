@@ -259,11 +259,11 @@ p{margin:0}
     crossbow:'<svg viewBox="0 0 64 30" aria-hidden="true"><rect x="2" y="13" width="50" height="4"/><path d="M2 17h16l-5 9H6z"/><path d="M47 1c6 3 9 8 9 14s-3 11-9 14l-1-3c5-3 7-7 7-11s-2-8-7-11z"/><path d="M47 2 23 14l24 13v-2L27 14 47 4z"/></svg>'
   };
   const WEAPONS = [
-    {id:'pistol', name:'Pistol', sub:'6 rounds. Quick, but it pulls off line.', rounds:6, need:1, spread:15, cool:.25, hint:'Tap the target to fire.', kick:5},
+    {id:'pistol', name:'Pistol', sub:'6 rounds. Quick, but it pulls off line.', rounds:6, need:1, spread:15, cool:.25, hint:'Tap to fire, or hold and drag to line up the crosshair, then let go.', kick:5},
     {id:'sniper', name:'Sniper', sub:'3 rounds. The scope slows the target.', rounds:3, need:1, spread:0, cool:.6, hint:'Press and hold to look through the scope. Drag to aim, let go to fire. Let go early to lower the rifle.', kick:11},
-    {id:'web', name:'Spider web', sub:'4 webs. Huge net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:2, hint:'Tap ahead of the target to fire a sticky web.', kick:1},
-    {id:'axe', name:'Throwing axe', sub:'3 axes. Big hit area, slow flight.', rounds:3, need:1, spread:7, cool:.2, flight:.42, reach:1.4, hint:'Tap ahead of the target. The axe takes a moment to arrive.', kick:3},
-    {id:'crossbow', name:'Crossbow', sub:'4 bolts. Exact, with a short delay.', rounds:4, need:1, spread:2, cool:.2, flight:.2, hint:'Tap slightly ahead of the target to shoot a bolt.', kick:2}
+    {id:'web', name:'Spider web', sub:'4 webs. Huge net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:2, hint:'Tap ahead of the target, or hold and drag the crosshair, then let go.', kick:1},
+    {id:'axe', name:'Throwing axe', sub:'3 axes. Big hit area, slow flight.', rounds:3, need:1, spread:7, cool:.2, flight:.42, reach:1.4, hint:'The axe takes a moment to arrive. Hold and drag the crosshair ahead of the target, then let go.', kick:3},
+    {id:'crossbow', name:'Crossbow', sub:'4 bolts. Exact, with a short delay.', rounds:4, need:1, spread:2, cool:.2, flight:.2, hint:'Tap slightly ahead of the target, or hold and drag the crosshair, then let go.', kick:2}
   ];
 
   const PENALTIES = [
@@ -297,7 +297,7 @@ p{margin:0}
   let chaos = false, halt = false, wayX = 0, back = 0, vy = 0, dir = 1, zig = .4, dart = 1, squash = 0;
   let aimT = 0, gunIn = 0, recoil = 0, gunAng = 0, gs = 190, prevPt = null;
   let gunAim = {x:0, y:0}, muzzle = {x:0, y:0}, tracers = [];
-  let webbed = false, cracks = [], shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
+  let holding = false, holdStart = 0, touchPt = {x: 0, y: 0}, webbed = false, cracks = [], shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
   let gun3d = null, targetOut = false, spawn = 0, mailTimer = 0, rBig = 60, rSmall = 36;
   let penalties = [], penaltyBag = [];
   let bubble = null, lastLaugh = -9, nextLaugh = 0;
@@ -622,6 +622,12 @@ p{margin:0}
   function frame(now) {
     const dt = Math.min(.05, (now - (frame.t || now)) / 1000); frame.t = now; clock += dt;
     updateTarget(dt);
+    if (holding) {
+      if (phase !== 'shoot') holding = false;
+      /* Lift the crosshair clear of the finger, so a quick tap still lands where it touched. */
+      const lift = Math.min(76, Math.max(0, clock - holdStart - .1) * 420);
+      gunAim = {x: touchPt.x, y: Math.max(0, touchPt.y - lift)};
+    }
     cooling = Math.max(0, cooling - dt); flash = Math.max(0, flash - dt * 7); hitPulse = Math.max(0, hitPulse - dt * 3); shake = Math.max(0, shake - dt * 40);
     spawn = Math.max(0, spawn - dt * 4);
     squash = Math.max(0, squash - dt * 6); recoil = Math.max(0, recoil - dt * 6);
@@ -1146,7 +1152,8 @@ p{margin:0}
     if (phase === 'setup' && photo) { drag = {...point(e), ox, oy}; return; }
     if (phase !== 'shoot') return;
     if (weapon.id === 'sniper') { aiming = true; prevPt = point(e); }
-    else { gunAim = point(e); fire(gunAim); }
+    else if (e.pointerType === 'mouse') { gunAim = point(e); fire(gunAim); }
+    else { holding = true; holdStart = clock; touchPt = point(e); gunAim = {...touchPt}; }
   });
   cv.addEventListener('pointermove', e => {
     if (drag) {
@@ -1158,21 +1165,23 @@ p{margin:0}
       aim.x = Math.max(0, Math.min(W, aim.x + (q.x - prevPt.x) * 1.25));
       aim.y = Math.max(0, Math.min(H, aim.y + (q.y - prevPt.y) * 1.25));
       prevPt = q;
-    } else if (e.pointerType === 'mouse' && phase === 'shoot') gunAim = point(e);
+    } else if (holding) touchPt = point(e);
+    else if (e.pointerType === 'mouse' && phase === 'shoot') gunAim = point(e);
   });
   cv.addEventListener('pointerup', () => {
     drag = null;
     if (aiming) { aiming = false; if (aimT > .75) fire(swayed()); }
+    if (holding) { holding = false; fire(gunAim, clock - holdStart > .35); }
   });
-  cv.addEventListener('pointercancel', () => { drag = null; aiming = false; });
+  cv.addEventListener('pointercancel', () => { drag = null; aiming = false; holding = false; });
 
-  function fire(q) {
+  function fire(q, steady) {
     if (phase !== 'shoot' || rounds <= 0 || cooling > 0 || shot) return;
     const thrown = !!weapon.flight;
     rounds--; shotsTotal++; cooling = weapon.cool + (weapon.flight || 0); flash = thrown ? 0 : 1; shake = calm ? 0 : weapon.kick; recoil = 1;
     bang(weapon.id === 'sniper' ? 2 : weapon.id === 'axe' ? 1.2 : weapon.id === 'crossbow' ? .35 : weapon.id === 'web' ? .7 : 1, weapon.id === 'axe' ? 650 : weapon.id === 'crossbow' || weapon.id === 'web' ? 2400 : 1500);
     try { navigator.vibrate && navigator.vibrate(weapon.id === 'sniper' ? 40 : 15); } catch (e) {}
-    const a = Math.random() * 7, d = Math.random() * weapon.spread;
+    const a = Math.random() * 7, d = Math.random() * weapon.spread * (steady ? .2 : 1);
     const x = q.x + Math.cos(a) * d, y = q.y + Math.sin(a) * d;
     if (thrown) { shot = {x, y, t: 0}; renderHud(); return; }
     if (weapon.id === 'pistol') tracers.push({x, y, life: 1});
