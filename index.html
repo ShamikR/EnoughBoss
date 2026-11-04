@@ -46,7 +46,7 @@ h1{margin:0;font:400 clamp(19px,2.2vw,28px)/1.1 var(--display);letter-spacing:.0
 .tally button{white-space:nowrap}
 h1{min-width:0}
 .tally button{all:unset;white-space:nowrap;cursor:pointer;padding:4px clamp(4px,1.2vw,7px);border:1px solid var(--form);border-radius:3px;font-size:12px}
-#range{position:relative;min-height:0;overflow:hidden}
+#range{position:relative;min-height:0;overflow:hidden;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
 #gl{pointer-events:none;visibility:hidden}
 #stamp{position:absolute;left:50%;top:50%;pointer-events:none;font:700 clamp(38px,12vw,62px)/1 var(--stencil);letter-spacing:.04em;padding:6px 14px;border:6px solid currentColor;border-radius:8px;background:rgba(251,250,243,.86);transform:translate(-50%,-50%) rotate(-9deg)}
@@ -261,7 +261,7 @@ p{margin:0}
   const WEAPONS = [
     {id:'pistol', name:'Pistol', sub:'6 rounds. Quick, but it pulls off line.', rounds:6, need:1, spread:15, cool:.25, hint:'Tap to fire, or hold and drag to line up the crosshair, then let go.', kick:5},
     {id:'sniper', name:'Sniper', sub:'3 rounds. The scope slows the target.', rounds:3, need:1, spread:0, cool:.6, hint:'Press and hold to look through the scope. Drag to aim, let go to fire. Let go early to lower the rifle.', kick:11},
-    {id:'web', name:'Spider web', sub:'4 webs. Huge net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:2, hint:'Tap ahead of the target, or hold and drag the crosshair, then let go.', kick:1},
+    {id:'web', name:'Spider web', sub:'4 webs. Huge net, medium delay.', rounds:4, need:1, spread:4, cool:.2, flight:.3, reach:2.95, hint:'Tap ahead of the target, or hold and drag the crosshair, then let go.', kick:1},
     {id:'axe', name:'Throwing axe', sub:'3 axes. Big hit area, slow flight.', rounds:3, need:1, spread:7, cool:.2, flight:.42, reach:1.4, hint:'The axe takes a moment to arrive. Hold and drag the crosshair ahead of the target, then let go.', kick:3},
     {id:'crossbow', name:'Crossbow', sub:'4 bolts. Exact, with a short delay.', rounds:4, need:1, spread:2, cool:.2, flight:.2, hint:'Tap slightly ahead of the target, or hold and drag the crosshair, then let go.', kick:2}
   ];
@@ -458,7 +458,7 @@ p{margin:0}
   function drawCracks(g) {
     g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
     for (const c of cracks) {
-      if (c.web) { drawWeb(g, c.x, c.y, Math.max(44, r * 1.65)); continue; }
+      if (c.web) { drawWeb(g, c.x, c.y, r * 1.95); continue; }
       for (const [lift, colour, width] of [[.9, 'rgba(172,202,214,.45)', 1.1], [0, '#0b1319', 1.5]]) {
         g.strokeStyle = colour; g.lineWidth = width; g.beginPath();
         for (const ray of c.rays) ray.forEach(([x, y], i) => i ? g.lineTo(c.x + x + lift, c.y + y + lift) : g.moveTo(c.x + x + lift, c.y + y + lift));
@@ -1145,17 +1145,15 @@ p{margin:0}
 
   /* ---------- shooting ---------- */
   function point(e) { const b = cv.getBoundingClientRect(); return {x: e.clientX - b.left, y: e.clientY - b.top}; }
-  cv.addEventListener('pointerdown', e => {
-    e.preventDefault();
+  const inputDown = e => {
     wakeAudio();
-    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     if (phase === 'setup' && photo) { drag = {...point(e), ox, oy}; return; }
     if (phase !== 'shoot') return;
     if (weapon.id === 'sniper') { aiming = true; prevPt = point(e); }
     else if (e.pointerType === 'mouse') { gunAim = point(e); fire(gunAim); }
     else { holding = true; holdStart = clock; touchPt = point(e); gunAim = {...touchPt}; }
-  });
-  cv.addEventListener('pointermove', e => {
+  };
+  const inputMove = e => {
     if (drag) {
       const q = point(e), k = face.width / (r * 1.48);
       ox = drag.ox + (q.x - drag.x) * k; oy = drag.oy + (q.y - drag.y) * k; renderFace(); return;
@@ -1167,13 +1165,29 @@ p{margin:0}
       prevPt = q;
     } else if (holding) touchPt = point(e);
     else if (e.pointerType === 'mouse' && phase === 'shoot') gunAim = point(e);
-  });
-  cv.addEventListener('pointerup', () => {
+  };
+  const inputUp = () => {
     drag = null;
     if (aiming) { aiming = false; if (aimT > .75) fire(swayed()); }
     if (holding) { holding = false; fire(gunAim, clock - holdStart > .35); }
+  };
+  const inputCancel = () => { drag = null; aiming = false; holding = false; };
+  /* Touch uses its own events: browsers can cancel pointer events during a long press. */
+  const fromTouch = e => { const t = e.changedTouches[0]; return {clientX: t.clientX, clientY: t.clientY, pointerType: 'touch'}; };
+  cv.addEventListener('touchstart', e => { e.preventDefault(); inputDown(fromTouch(e)); }, {passive: false});
+  cv.addEventListener('touchmove', e => { e.preventDefault(); inputMove(fromTouch(e)); }, {passive: false});
+  cv.addEventListener('touchend', e => { e.preventDefault(); wakeAudio(); inputUp(); }, {passive: false});
+  cv.addEventListener('touchcancel', inputCancel);
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  cv.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    inputDown(e);
   });
-  cv.addEventListener('pointercancel', () => { drag = null; aiming = false; holding = false; });
+  cv.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') inputMove(e); });
+  cv.addEventListener('pointerup', e => { if (e.pointerType !== 'touch') inputUp(); });
+  cv.addEventListener('pointercancel', e => { if (e.pointerType !== 'touch') inputCancel(); });
 
   function fire(q, steady) {
     if (phase !== 'shoot' || rounds <= 0 || cooling > 0 || shot) return;
