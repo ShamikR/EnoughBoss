@@ -294,7 +294,7 @@ p{margin:0}
   let chaos = false, halt = false, wayX = 0, back = 0, vy = 0, dir = 1, zig = .4, dart = 1, squash = 0;
   let aimT = 0, gunIn = 0, recoil = 0, gunAng = 0, gs = 190, prevPt = null;
   let gunAim = {x:0, y:0}, muzzle = {x:0, y:0}, tracers = [];
-  let shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
+  let cracks = [], shotsTotal = 0, result = null, shot = null, strikes = 0, fired = false, ringBus = null;
   let gun3d = null, targetOut = false, spawn = 0, mailTimer = 0, rBig = 60, rSmall = 36;
   let penalties = [], penaltyBag = [];
   let bubble = null, lastLaugh = -9, nextLaugh = 0;
@@ -417,9 +417,42 @@ p{margin:0}
     g.drawImage(bg, 0, 0, W, H);
     for (const m of marks) { g.globalAlpha = Math.min(1, m.life); g.fillStyle = '#0d151c'; g.beginPath(); g.arc(m.x, m.y, 3, 0, 7); g.fill(); }
     g.globalAlpha = 1;
+    drawCracks(g);
     if (targetOut) return;
     drawTarget(g, tx, ty);
     if (bubble) drawBubble(g);
+  }
+  /* A miss cracks the wall and the damage stays until the next request. */
+  function addCrack(x, y) {
+    const size = {pistol: 1, sniper: 1.45, axe: 1.9, crossbow: .8}[weapon.id] || 1;
+    const rays = [], count = 6 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < count; i++) {
+      let a = i / count * Math.PI * 2 + Math.random() * .5, px = 0, py = 0;
+      const pts = [[0, 0]], steps = 3 + Math.floor(Math.random() * 3), step = (7 + Math.random() * 10) * size;
+      for (let s = 0; s < steps; s++) {
+        a += (Math.random() - .5) * .95; px += Math.cos(a) * step; py += Math.sin(a) * step; pts.push([px, py]);
+        if (Math.random() < .3) {
+          const b = a + (Math.random() < .5 ? -1 : 1) * (.5 + Math.random() * .6), l = step * (.6 + Math.random() * .7);
+          rays.push([[px, py], [px + Math.cos(b) * l, py + Math.sin(b) * l]]);
+        }
+      }
+      rays.push(pts);
+    }
+    cracks.push({x, y, size, rays});
+    if (cracks.length > 24) cracks.shift();
+  }
+  function drawCracks(g) {
+    g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const c of cracks) {
+      for (const [lift, colour, width] of [[.9, 'rgba(172,202,214,.45)', 1.1], [0, '#0b1319', 1.5]]) {
+        g.strokeStyle = colour; g.lineWidth = width; g.beginPath();
+        for (const ray of c.rays) ray.forEach(([x, y], i) => i ? g.lineTo(c.x + x + lift, c.y + y + lift) : g.moveTo(c.x + x + lift, c.y + y + lift));
+        g.stroke();
+      }
+      g.fillStyle = '#080e13'; g.beginPath(); g.arc(c.x, c.y, 3.2 * c.size, 0, 7); g.fill();
+      g.strokeStyle = 'rgba(172,202,214,.4)'; g.lineWidth = 1; g.beginPath(); g.arc(c.x, c.y, 4.6 * c.size, .4, 2.6); g.stroke();
+    }
+    g.restore();
   }
   function drawBubble(g) {
     g.save();
@@ -446,7 +479,7 @@ p{margin:0}
     if (phase === 'setup') { tx = W / 2; ty = H * .54; tilt = 0; return; }
     if (halt) { tilt *= .9; return; }
     if (chaos) {
-      const d = dt * slow * .9, left = r + 6, right = W - r - 6, top = 26 + r * 1.3;
+      const d = dt * slow * .72, left = r + 6, right = W - r - 6, top = 26 + r * 1.3;
       const floor = Math.max(top + 40, H - 20 - r);
       zig -= d;
       if (zig <= 0) { zig = (.3 + Math.random() * .35) / (.7 + speed * .15); back = .09; dart = 2; }
@@ -1091,7 +1124,7 @@ p{margin:0}
       holes.push({x: Math.max(-.8, Math.min(.8, dx / r)), y: Math.max(-.8, Math.min(.8, dy / r))});
       if (hits >= weapon.need) { win(); return; }
     } else {
-      marks.push({x, y, life: 1.6});
+      addCrack(x, y);
       speed += .15; strikes++;
       later(240, strikes >= 5 ? terminate : punish);
       phase = 'mail';
@@ -1323,7 +1356,7 @@ p{margin:0}
   }
   function toAsk() {
     timers.forEach(clearTimeout); timers = [];
-    stamp(''); attempt = 0; speed = .6; holes = []; marks = []; chaos = false; halt = false; bubble = null; penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; targetOut = false; hideMail(); show('ask');
+    stamp(''); attempt = 0; speed = .6; holes = []; marks = []; chaos = false; halt = false; bubble = null; penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; cracks = []; targetOut = false; hideMail(); show('ask');
   }
   function grant(viaShot) {
     tally.won++; saveTally();
@@ -1382,7 +1415,7 @@ p{margin:0}
   $('again').onclick = toAsk;
   $('newFace').onclick = $('restart').onclick = () => {
     stamp(''); holes = []; marks = []; speed = 0; chaos = false; halt = false; bubble = null;
-    penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; targetOut = false; hideMail(); show('setup');
+    penalties = []; strikes = 0; fired = false; shotsTotal = 0; result = null; cracks = []; targetOut = false; hideMail(); show('setup');
   };
 
   /* ---------- build lists ---------- */
